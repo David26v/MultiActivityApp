@@ -39,7 +39,6 @@ const ProfileModal = ({ isOpen, onClose }) => {
         setProfile(profileData);
         setFullName(profileData.full_name);
         setBio(profileData.bio || "");
-        // If there's an existing avatar, show it
         if (profileData.avatar_url) {
           setAvatarFile(profileData.avatar_url);
         }
@@ -49,49 +48,51 @@ const ProfileModal = ({ isOpen, onClose }) => {
     fetchUserData();
   }, [isOpen]);
 
-  const handleImageUpload = async () => {
-    if (!avatarFile) return null;
+  const handleFileUpload = async (file) => {
+  if (!file) return null; // Ensure file exists
+  
+  const fileExt = file.name.split(".").pop();
+  const filePath = `avatar/${user.id}.${fileExt}`; 
+  
+  const { data, error } = await supabase.storage
+    .from("avatar") 
+    .upload(filePath, file, { upsert: true });
 
-    const fileExt = avatarFile.name.split(".").pop();
-    const fileName = `${user.id}-avatar.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
+  if (error) {
+    console.error("Error uploading image:", error.message);
+    return null;
+  }
 
-    const { data, error } = await supabase.storage
-      .from("avatars")
-      .upload(filePath, avatarFile, { upsert: true });
+  // Get the public URL of the uploaded image
+  const { data: urlData } = supabase.storage.from("avatar").getPublicUrl(filePath);
+  return urlData.publicUrl;
+};
 
-    if (error) {
-      console.error("Error uploading image:", error.message);
-      return null;
-    }
-
-    const imageUrl = supabase.storage.from("avatars").getPublicUrl(filePath).publicURL;
-    return imageUrl;
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
+  
     try {
       // Handle email update
       if (newEmail && newEmail !== user?.email) {
         const { error: emailError } = await supabase.auth.updateUser({ email: newEmail });
         if (emailError) throw emailError;
       }
-
+  
       let avatarUrl = profile?.avatar_url;
+  
       if (avatarFile) {
-        avatarUrl = await handleImageUpload();
+        avatarUrl = await handleFileUpload(avatarFile);
         if (!avatarUrl) throw new Error("Image upload failed.");
       }
-
+  
       const profileData = { full_name: fullName, bio, avatar_url: avatarUrl };
-
+  
       const { error: profileError } = profile
         ? await supabase.from("profiles").update(profileData).eq("id", user?.id)
         : await supabase.from("profiles").insert([{ id: user?.id, ...profileData }]);
-
+  
       if (profileError) throw profileError;
       onClose();
     } catch (error) {
@@ -100,6 +101,7 @@ const ProfileModal = ({ isOpen, onClose }) => {
       setLoading(false);
     }
   };
+  
 
   if (!show) return null;
 

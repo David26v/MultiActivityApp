@@ -1,35 +1,38 @@
-// components/Navigation.js
+"use client"; 
 import Link from "next/link";
+import { usePathname } from "next/navigation"; 
+import { List, FileText, Star, FileEdit } from "lucide-react";
+
+const links = [
+  { href: "/activity1", label: "Todo List", icon: List },
+  { href: "/activity2", label: "Google Drive Lite", icon: FileText },
+  { href: "/activity3", label: "Food Review App", icon: Star },
+  { href: "/activity4", label: "Pokemon Review", icon: Star },
+  { href: "/activity5", label: "Markdown Notes", icon: FileEdit },
+];
 
 const Navigation = () => {
+  const pathname = usePathname(); // Correct way to get the current route
+
   return (
-    <nav>
+    <nav className="w-auto h-auto bg-black text-white p-4">
+      <h2 className="text-lg font-semibold mb-4">Activities</h2>
       <ul className="space-y-2">
-        <li>
-          <Link href="/activity1" className="text-blue-500 hover:underline">
-            Activity 1: TodoList
-          </Link>
-        </li>
-        <li>
-          <Link href="/activity2" className="text-blue-500 hover:underline">
-          Activity 2: Google Drive "Lite
-          </Link>
-        </li>
-        <li>
-          <Link href="/activity3" className="text-blue-500 hover:underline">
-          Activity 3: Food Review App
-          </Link>
-        </li>
-        <li>
-          <Link href="/activity4" className="text-blue-500 hover:underline">
-          Activity 4: Pokemon Review App
-          </Link>
-        </li>
-        <li>
-          <Link href="/activity5" className="text-blue-500 hover:underline">
-          Activity 5: Markdown Notes App 
-          </Link>
-        </li>
+        {links.map(({ href, label, icon: Icon }) => (
+          <li key={href}>
+            <Link
+              href={href}
+              className={`flex items-center gap-2 p-3 rounded-md transition ${
+                pathname === href
+                  ? "bg-blue-600 text-white"
+                  : "hover:bg-gray-800 text-gray-300"
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              <span>{label}</span>
+            </Link>
+          </li>
+        ))}
       </ul>
     </nav>
   );

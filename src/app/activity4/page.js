@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 
 
 const PokemonReviewApp = () => {
+  const [user, setUser] = useState(null);
   const [pokemons, setPokemons] = useState([]);
   const [reviews, setReviews] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -13,24 +14,40 @@ const PokemonReviewApp = () => {
   const [sortByDate, setSortByDate] = useState('desc');
   const [selectedPokemon, setSelectedPokemon] = useState(null);
   const [imageUrl, setImageUrl] = useState('');
-  const [editReview, setEditReview] = useState(null); 
-  const [editedReviewText, setEditedReviewText] = useState(''); 
-  const [reviewText, setReviewText] = useState(''); 
+  const [editReview, setEditReview] = useState(null);
+  const [editedReviewText, setEditedReviewText] = useState('');
+  const [reviewText, setReviewText] = useState('');
 
   const router = useRouter();
 
 
+  const checkUser = async () => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error("Error getting user: " + error.message);
+    } else {
+      setUser(data.user);
+    }
+  };
+
+  useEffect(() => {
+    checkUser();
+  }, []);
+
   // Fetch Pokémon and reviews
   useEffect(() => {
-    fetchPokemons();
-  }, [searchTerm, sortOrder, sortByDate]);
+    if (user) {
+      fetchPokemons(user.id);
+    }
+  }, [user, searchTerm, sortOrder, sortByDate]);
 
-  const fetchPokemons = async () => {
+  const fetchPokemons = async (userId) => {
     const { data, error } = await supabase
       .from('pokemons')
       .select('*')
       .ilike('name', `%${searchTerm}%`)
       .order('name', { ascending: sortOrder === 'asc' })
+      .eq('user_id', userId)
       .order('upload_date', { ascending: sortByDate === 'asc' });
 
     if (error) {
@@ -81,9 +98,12 @@ const PokemonReviewApp = () => {
 
       setImageUrl(urlData.publicUrl);
       await supabase.from('pokemons').insert([
-        { name: file.name, image_url: urlData.publicUrl },
-      ]);
-      fetchPokemons();
+        {
+          name: file.name,
+          image_url: urlData.publicUrl,
+          user_id: user.id
+        }]);
+      fetchPokemons(user.id);
     } catch (err) {
       console.error(err);
     }
@@ -130,7 +150,7 @@ const PokemonReviewApp = () => {
 
   const handleSelectPokemon = (pokemon) => {
     setSelectedPokemon(pokemon);
-    setReviewText(''); 
+    setReviewText('');
   };
 
   const handleSortToggle = () => {
@@ -142,20 +162,20 @@ const PokemonReviewApp = () => {
   };
 
   return (
-    <div className="min-h-screen text-black p-6" 
-        style={{
-          backgroundImage: 'url(./pokemon_bg.png)',
-          backgroundSize: 'cover',  
-          backgroundPosition: 'center', 
-          backgroundRepeat: 'no-repeat', 
+    <div className="min-h-screen text-black p-6"
+      style={{
+        backgroundImage: 'url(./pokemon_bg.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
       }}
->
-    <button 
-        onClick={() => router.push('/')} 
-        className="mb-4 px-4 py-2 bg-gray-800 text-white rounded-lg"
     >
+      <button
+        onClick={() => router.push('/')}
+        className="mb-4 px-4 py-2 bg-gray-800 text-white rounded-lg"
+      >
         Back to Homepage
-    </button>
+      </button>
       <h1 className="text-4xl font-semibold mb-6 text-center text-white">Pokemon Review App</h1>
 
       {/* Search and Sort */}
@@ -253,14 +273,14 @@ const PokemonReviewApp = () => {
                           Save Changes
                         </button>
                         <button
-                            onClick={() => {
+                          onClick={() => {
                             setEditReview(null);
                             setEditedReviewText('');
-                            }}
-                            className="mt-2 px-4 py-2 bg-gray-500 text-white rounded-lg shadow-md ml-2"
+                          }}
+                          className="mt-2 px-4 py-2 bg-gray-500 text-white rounded-lg shadow-md ml-2"
                         >
-                            Cancel
-                         </button>
+                          Cancel
+                        </button>
                       </div>
                     ) : (
                       <div>
@@ -273,8 +293,8 @@ const PokemonReviewApp = () => {
                         </button>
                         <button
                           onClick={() => {
-                            setEditReview(review); 
-                            setEditedReviewText(review.review); 
+                            setEditReview(review);
+                            setEditedReviewText(review.review);
                           }}
                           className="text-blue-500 text-sm ml-2  cursor-pointer"
                         >

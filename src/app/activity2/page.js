@@ -7,24 +7,44 @@ import { useRouter } from 'next/navigation';
 
 const GoogleDrive = () => {
   const [photos, setPhotos] = useState([]);
+  const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortOrder, setSortOrder] = useState('asc'); 
+  const [sortOrder, setSortOrder] = useState('asc');
   const [imageUrl, setImageUrl] = useState('');
-  const [loading, setLoading] = useState(false); 
+  const [loading, setLoading] = useState(false);
   const [sortByDate, setSortByDate] = useState('desc');
 
   const router = useRouter();
 
-  useEffect(() => {
-    fetchPhotos();
-  }, [sortOrder, searchTerm,sortByDate]);
+  const checkUser = async () => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error("Error getting user: " + error.message);
+    } else {
+      setUser(data.user);
+    }
+  };
 
-  const fetchPhotos = async () => {
-    setLoading(true); // Start loading
+  useEffect(() => {
+    checkUser();
+  }, []);
+
+
+  useEffect(() => {
+    if (user) {
+      fetchPhotos(user.id);
+    }
+
+  }, [user, sortOrder, searchTerm, sortByDate]);
+
+  const fetchPhotos = async (userId) => {
+    setLoading(true);
+
     const { data, error } = await supabase
       .from('photos')
       .select('*')
       .ilike('name', `%${searchTerm}%`)
+      .eq('user_id', userId)
       .order('name', { ascending: sortOrder === 'asc' })
       .order('upload_date', { ascending: sortByDate === 'asc' });
 
@@ -33,8 +53,9 @@ const GoogleDrive = () => {
     } else {
       setPhotos(data);
     }
-    setLoading(false); // Stop loading
+    setLoading(false);
   };
+
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -60,15 +81,15 @@ const GoogleDrive = () => {
   const handleUploadPhoto = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-  
+
     try {
       const uniqueFileName = `${Date.now()}-${file.name}`;
       const filePath = `uploads/${uniqueFileName}`;
-  
+
       const { data, error: uploadError } = await supabase.storage
         .from('photos')
         .upload(filePath, file);
-  
+
       if (uploadError) {
         console.error("Error uploading file:", uploadError.message || uploadError);
         return;
@@ -77,24 +98,29 @@ const GoogleDrive = () => {
       const { data: urlData, error: urlError } = await supabase.storage
         .from('photos')
         .getPublicUrl(data.path);
-  
+
       if (urlError) {
         console.error("Error getting public URL:", urlError.message || urlError);
         return;
       }
-  
+
       setImageUrl(urlData.publicUrl);
-  
+
       const { error: insertError } = await supabase
         .from('photos')
-        .insert([{ name: file.name, image_url: urlData.publicUrl, description: '' }]);
-  
+        .insert([{
+          name: file.name,
+          image_url: urlData.publicUrl,
+          description: '',
+          user_id: user.id
+        }]);
+
       if (insertError) {
         console.error("Error inserting photo data:", insertError.message || insertError);
         return;
       }
-  
-      fetchPhotos(); // Refresh UI
+
+      fetchPhotos(user.id);
     } catch (err) {
       console.error("Unexpected error:", err);
     }
@@ -105,10 +131,10 @@ const GoogleDrive = () => {
   };
 
 
-  return (    
+  return (
     <div className="min-h-screen bg-white text-black p-6">
-      <button 
-        onClick={() => router.push('/')} 
+      <button
+        onClick={() => router.push('/')}
         className="mb-4 px-4 py-2 bg-gray-800 text-white rounded-lg"
       >
         Back to Homepage
@@ -117,14 +143,14 @@ const GoogleDrive = () => {
 
       {/* Search Bar */}
       <div className="mb-4 flex items-center space-x-4">
-        <input 
-          type="text" 
+        <input
+          type="text"
           value={searchTerm}
           onChange={handleSearchChange}
-          placeholder="Search by photo name" 
+          placeholder="Search by photo name"
           className="border px-4 py-2 rounded-lg w-full sm:w-1/3"
         />
-        <button 
+        <button
           onClick={handleSortChange}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg"
         >
@@ -140,8 +166,8 @@ const GoogleDrive = () => {
 
       {/* Photo Upload */}
       <div className="mb-4">
-        <input 
-          type="file" 
+        <input
+          type="file"
           onChange={handleUploadPhoto}
           className="border px-4 py-2 rounded-lg w-full sm:w-1/3"
         />
@@ -158,17 +184,17 @@ const GoogleDrive = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         <AnimatePresence>
           {photos?.map((photo) => (
-            <motion.div 
-              key={photo.id} 
+            <motion.div
+              key={photo.id}
               className="bg-white shadow-md rounded-lg overflow-hidden"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 0.5 }}
             >
-              <motion.img 
-                src={photo.image_url} 
-                alt={photo.name} 
+              <motion.img
+                src={photo.image_url}
+                alt={photo.name}
                 className="w-full h-48 object-cover"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -178,8 +204,8 @@ const GoogleDrive = () => {
                 <h2 className="text-xl font-medium">{photo.name}</h2>
                 <p className="text-gray-500 text-sm">{new Date(photo.upload_date).toLocaleString()}</p>
                 <div className="mt-4 flex justify-between">
-                  <button 
-                    onClick={() => handleDelete(photo.id)} 
+                  <button
+                    onClick={() => handleDelete(photo.id)}
                     className="bg-red-500 text-white px-4 py-2 rounded-lg"
                   >
                     Delete

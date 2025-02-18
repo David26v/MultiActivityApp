@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
 const FoodReview = () => {
+  const [user, setUser] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState('asc');
@@ -15,18 +16,36 @@ const FoodReview = () => {
 
   const router = useRouter();
 
-  useEffect(() => {
-    fetchPhotos();
-  }, [sortOrder, searchTerm ,sortByDate]);
+  const checkUser = async () => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error("Error getting user: " + error.message);
+    } else {
+      setUser(data.user);
+    }
+  };
 
-  const fetchPhotos = async () => {
+  useEffect(() => {
+    checkUser();
+  }, []);
+
+
+  useEffect(() => {
+    if (user) {
+      fetchPhotos(user.id);
+    }
+
+  }, [user, sortOrder, searchTerm, sortByDate]);
+
+  const fetchPhotos = async (userId) => {
     const { data, error } = await supabase
       .from('photos')
       .select('*')
       .ilike('name', `%${searchTerm}%`)
+      .eq('user_id', userId)
       .order('name', { ascending: sortOrder === 'asc' })
-      .order('upload_date', { ascending: sortByDate === 'asc' }); 
-  
+      .order('upload_date', { ascending: sortByDate === 'asc' });
+
     if (error) {
       console.error(error);
     } else {
@@ -34,11 +53,11 @@ const FoodReview = () => {
       fetchReviews(data);
     }
   };
-  
+
 
   const fetchReviews = async (photos) => {
     const { data, error } = await supabase.from('reviews').select('*');
-    
+
     if (error) {
       console.error(error);
     } else {
@@ -53,27 +72,27 @@ const FoodReview = () => {
   const handleUploadPhoto = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     try {
       const uniqueFileName = `${Date.now()}-${file.name}`;
       const filePath = `uploads/${uniqueFileName}`;
-      
+
       const { data, error } = await supabase.storage
         .from('photos')
         .upload(filePath, file);
-      
+
       if (error) {
         console.error(error);
         return;
       }
 
-      const { data: urlData } = await supabase.storage
+      const { data: urlData } = supabase.storage
         .from('photos')
         .getPublicUrl(data.path);
-      
+
       setImageUrl(urlData.publicUrl);
-      await supabase.from('photos').insert([{ name: file.name, image_url: urlData.publicUrl }]);
-      fetchPhotos();
+      await supabase.from('photos').insert([{ name: file.name, image_url: urlData.publicUrl, user_id: user.id }]);
+      fetchPhotos(user.id);
     } catch (err) {
       console.error(err);
     }
@@ -81,10 +100,10 @@ const FoodReview = () => {
 
   const handleAddReview = async (photoId) => {
     if (!reviewText[photoId]?.trim()) return;
-    
+
     await supabase.from('reviews').insert([{ photo_id: photoId, review: reviewText[photoId] }]);
     setReviewText((prev) => ({ ...prev, [photoId]: '' }));
-    fetchPhotos();
+    fetchPhotos(user.id);
   };
 
   const handleReviewChange = (e, photoId) => {
@@ -93,8 +112,8 @@ const FoodReview = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 text-black p-6">
-      <button 
-        onClick={() => router.push('/')} 
+      <button
+        onClick={() => router.push('/')}
         className="mb-4 px-4 py-2 bg-gray-800 text-white rounded-full shadow-md"
       >
         Back to Homepage
@@ -102,20 +121,20 @@ const FoodReview = () => {
       <h1 className="text-4xl font-semibold mb-6 text-center">Food Review App</h1>
 
       <div className="mb-4 flex items-center justify-center space-x-4">
-        <input 
-          type="text" 
+        <input
+          type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search by food name" 
+          placeholder="Search by food name"
           className="border px-4 py-2 rounded-lg w-full sm:w-1/3 shadow-md"
         />
-        <button 
+        <button
           onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg shadow-md"
         >
           Sort by Name
         </button>
-        <button 
+        <button
           onClick={() => setSortByDate(sortByDate === 'asc' ? 'desc' : 'asc')}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg shadow-md"
         >
@@ -124,8 +143,8 @@ const FoodReview = () => {
       </div>
 
       <div className="mb-6 w-full">
-        <input 
-          type="file" 
+        <input
+          type="file"
           onChange={handleUploadPhoto}
           className="border px-4 py-2 rounded-lg w-full sm:w-1/3 shadow-md"
         />
@@ -133,10 +152,10 @@ const FoodReview = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
         {photos?.map((photo) => (
-          <motion.div 
-            key={photo.id} 
+          <motion.div
+            key={photo.id}
             className="bg-white shadow-lg rounded-lg overflow-hidden transition-transform transform hover:scale-105"
-            initial={{ opacity: 0, y: 20 }} 
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
@@ -146,14 +165,14 @@ const FoodReview = () => {
               <p className="text-gray-500 text-sm">{new Date(photo.upload_date).toLocaleString()}</p>
 
               <div className="mt-4">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={reviewText[photo.id] || ''}
                   onChange={(e) => handleReviewChange(e, photo.id)}
-                  placeholder="Write a review..." 
+                  placeholder="Write a review..."
                   className="border px-4 py-2 rounded-lg w-full shadow-md"
                 />
-                <button 
+                <button
                   onClick={() => handleAddReview(photo.id)}
                   className="mt-2 px-4 py-2 bg-green-500 text-white rounded-lg shadow-md"
                 >

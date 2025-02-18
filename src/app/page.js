@@ -30,6 +30,14 @@ const LoggedInUI = ({ user, handleLogout, handleDeleteAccount }) => {
   }
 
 
+  const handDeleteProfile = () => {
+    setIsDeleteConfirmOpen(true);  
+    setIsSettingsOpen(false);      
+  };
+
+
+
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6 text-center">
@@ -96,7 +104,7 @@ const LoggedInUI = ({ user, handleLogout, handleDeleteAccount }) => {
                 <FontAwesomeIcon icon={faSignOutAlt} className="mr-2" /> Logout
               </button>
               <button
-                onClick={() => setIsDeleteConfirmOpen(true)}
+                onClick={handDeleteProfile}
                 className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 w-full"
               >
                 <FontAwesomeIcon icon={faTrash} className="mr-2" /> Delete Account
@@ -166,15 +174,28 @@ const HomePage = () => {
 
 
   const handleDeleteAccount = async () => {
+    const { data: { user }, error } = await supabase.auth.getUser();
+  
+    if (error) {
+      console.error('Error fetching user:', error.message);
+      return;
+    }
+  
     if (user) {
-      const { error } = await supabase.auth.api.deleteUser(user.id);
-      if (error) {
-        console.error('Error deleting account:', error.message);
+      const { error: deleteError } = await supabase.auth.api.deleteUser(user.id);
+  
+      if (deleteError) {
+        console.error('Error deleting account:', deleteError.message);
       } else {
         console.log('Account successfully deleted');
       }
-    } 
+    } else {
+      console.error('User not found');
+    }
   };
+  
+
+  
 
   useEffect(() => {
     checkUser();

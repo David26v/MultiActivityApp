@@ -2,21 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faPlus } from "@fortawesome/free-solid-svg-icons";
-import { useRouter } from "next/navigation";
+import { faTrash, faPlus, faEye, faEdit } from "@fortawesome/free-solid-svg-icons";
+import { useRouter } from 'next/navigation';
 import supabase from "../utils/supabaseClient";
+import TaskForm from "../component/TaskForm";
 
 export default function TodoList() {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [newTask, setNewTask] = useState("");
-  const [category, setCategory] = useState("General");
-  const [assignedUser, setAssignedUser] = useState("");
-  const [project, setProject] = useState(""); 
-  const [projects, setProjects] = useState([]); 
-  const [dueDate, setDueDate] = useState("");
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [mode, setMode] = useState("add"); // "add", "edit", "view"
   const [showModal, setShowModal] = useState(false);
+
   const router = useRouter();
 
   useEffect(() => {
@@ -28,29 +25,8 @@ export default function TodoList() {
   }, []);
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      const { data, error } = await supabase.from("profiles").select("*");
-      if (!error) setUsers(data);
-    };
-    fetchUsers();
-  }, []);
-
-  useEffect(() => {
     if (user) fetchTasks(user.id);
   }, [user]);
-
-  useEffect(() => {
-    const fetchProjects = async () => {
-      const { data, error } = await supabase.from("projects").select("*");
-      if (error) {
-        console.error("Error fetching projects:", error);
-        setProjects([]);
-      } else {
-        setProjects(data || []);
-      }
-    };
-    fetchProjects();
-  }, []);
 
   const fetchTasks = async (userId) => {
     if (!userId) return;
@@ -58,109 +34,55 @@ export default function TodoList() {
     if (!error) setTasks(data);
   };
 
-  const addTask = async () => {
-    if (newTask.trim() && assignedUser && project) {
-      if (!user?.id) return;
-
-      const { data, error } = await supabase
-        .from("todos")
-        .insert([
-          {
-            task: newTask,
-            category,
-            assigned_to: assignedUser,
-            due_date: dueDate || null,
-            completed: false,
-            user_id: user.id,
-            project_id: project, // Ensure this stores the project ID correctly
-          },
-        ])
-        .select("*");
-
-      if (error) {
-        console.error("Supabase Insert Error:", error.message);
-        return;
-      }
-
-      setTasks([...tasks, ...data]);
-      setNewTask("");
-      setCategory("General");
-      setAssignedUser("");
-      setDueDate("");
-      setProject("");
-      setShowModal(false);
-    }
-  };
-
-  const deleteTask = async (taskId) => {
-    const { error } = await supabase.from("todos").delete().eq("id", taskId);
-    if (!error) setTasks(tasks.filter((task) => task.id !== taskId));
-  };
-
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Your Tasks</h1>
-      <button onClick={() => router.push('/')} className="mb-4 bg-blue-500 text-white p-2 rounded">
+    <div className="p-4 bg-white min-h-screen">
+      <button
+        onClick={() => router.push('/')}
+        className="mb-4 px-4 py-2 bg-gray-800 text-white rounded-lg"
+      >
         Back to Homepage
       </button>
+      <button 
+        onClick={() => { setSelectedTask(null); setMode("add"); setShowModal(true); }} 
+        className="bg-blue-500 text-white p-2 rounded mb-4 flex items-center"
+      >
+        <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Task
+      </button>
 
-      {/* Task Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {tasks.map((task) => (
-          <div key={task.id} className="bg-white shadow-md p-4 rounded-lg">
-            <h2 className="text-lg font-semibold text-black">{task.task}</h2>
-            <p className="text-sm text-gray-600">Category: {task.category}</p>
-            <p className="text-sm text-gray-500">
-              Assigned To: {users.find((u) => u.id === task.assigned_to)?.name || "Unassigned"}
-            </p>
-            <p className="text-sm text-gray-500">Due Date: {task.due_date || "No due date"}</p>
-            <button onClick={() => deleteTask(task.id)} className="mt-4 text-red-500 text-sm flex items-center">
-              <FontAwesomeIcon icon={faTrash} className="mr-1" />
-              Delete
-            </button>
+          <div key={task.id} className="bg-white shadow-md rounded-lg p-4">
+            <h2 className="text-lg font-bold text-black">{task.task}</h2>
+            <p className="text-sm text-gray-600">{task.due_date ? `Due: ${task.due_date}` : "No due date"}</p>
+
+            <div className="flex justify-between mt-3">
+              <button 
+                onClick={() => { setSelectedTask(task); setMode("view"); setShowModal(true); }} 
+                className="bg-gray-300 text-black p-2 rounded"
+              >
+                <FontAwesomeIcon icon={faEye} />
+              </button>
+              <button 
+                onClick={() => { setSelectedTask(task); setMode("edit"); setShowModal(true); }} 
+                className="bg-yellow-500 text-white p-2 rounded"
+              >
+                <FontAwesomeIcon icon={faEdit} />
+              </button>
+              <button 
+                onClick={async () => {
+                  await supabase.from("todos").delete().eq("id", task.id);
+                  fetchTasks(user.id); // Refresh tasks
+                }} 
+                className="bg-red-500 text-white p-2 rounded"
+              >
+                <FontAwesomeIcon icon={faTrash} />
+              </button>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Add Task Button */}
-      <div className="mt-6">
-        <button onClick={() => setShowModal(true)} className="bg-green-500 text-white px-4 py-2 rounded-md flex items-center">
-          <FontAwesomeIcon icon={faPlus} className="mr-2" />
-          Add Task
-        </button>
-      </div>
-
-      {/* Task Modal */}
-      {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10">
-          <div className="bg-white p-6 rounded-lg shadow-md w-96">
-            <h2 className="text-xl font-bold text-black mb-4">Add a New Task</h2>
-            <input type="text" value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Task description" className="border p-2 w-full mb-4 text-black" />
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="border p-2 w-full mb-4 text-black" />
-
-            {/* Assign to User */}
-            <select value={assignedUser} onChange={(e) => setAssignedUser(e.target.value)} className="border p-2 w-full mb-4 text-black">
-              <option value="">Assign to...</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>{u.full_name || u.email}</option>
-              ))}
-            </select>
-
-            {/* Select Project */}
-            <select value={project} onChange={(e) => setProject(e.target.value)} className="border p-2 w-full mb-4 text-black">
-              <option value="">Select Project</option>
-              {projects.map((proj) => (
-                <option key={proj.id} value={proj.id}>{proj.name}</option>
-              ))}
-            </select>
-
-            <div className="flex justify-between">
-              <button onClick={() => setShowModal(false)} className="bg-gray-500 text-white p-2 rounded">Cancel</button>
-              <button onClick={addTask} className="bg-blue-500 text-white p-2 rounded">Add Task</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showModal && <TaskForm task={selectedTask} mode={mode} onClose={() => setShowModal(false)} onTaskUpdated={fetchTasks} />}
     </div>
   );
 }

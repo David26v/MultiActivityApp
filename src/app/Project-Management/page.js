@@ -1,5 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState ,useEffect } from "react";
+import { useRouter } from "next/navigation";
+import supabase from "../utils/supabaseClient";
+
 
 const ProjectManagement = () => {
   const [step, setStep] = useState(1);
@@ -10,22 +13,41 @@ const ProjectManagement = () => {
   const [modules, setModules] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const createProject = () => {
-    if (newProject.name.trim() === "") return;
-    const project = { id: projects.length + 1, ...newProject, modules: [] };
-    setProjects([...projects, project]);
-    setSelectedProject(project);
-    setNewProject({ name: "", description: "" });
-    setStep(2);
-  };
+  const router = useRouter();
 
+ // Create new project
+const createProject = async () => {
+  if (newProject.name.trim() === "") return;
+
+  // Create new project in Supabase
+  const { data, error } = await supabase.from("projects").insert([
+    {
+      name: newProject.name,
+      description: newProject.description,
+    },
+  ]);
+
+  if (error) {
+    console.error("Error creating project: ", error.message);
+    return;
+  }
+
+  // Update local state with the new project
+  setProjects((prevProjects) => [data[0], ...prevProjects]);
+  setSelectedProject(data[0]);
+  setNewProject({ name: "", description: "" });
+  setStep(2);
+};
+
+
+  // Add new module to the selected project
   const addModule = () => {
     if (!selectedProject || newModule.trim() === "") return;
-    const updatedModules = [...modules, { name: newModule }];
-    setModules(updatedModules);
+    setModules([...modules, { name: newModule }]);
     setNewModule("");
   };
 
+  // Finalize and save project
   const finalizeProject = () => {
     const updatedProjects = projects.map((p) =>
       p.id === selectedProject.id ? { ...p, modules } : p
@@ -33,14 +55,16 @@ const ProjectManagement = () => {
     setProjects(updatedProjects);
     setModules([]);
     setSelectedProject(null);
-    setStep(0);
+    setStep(1);
     setIsModalOpen(false);
   };
 
+  // Delete project
   const deleteProject = (id) => {
     setProjects(projects.filter((project) => project.id !== id));
   };
 
+  // Edit project
   const editProject = (project) => {
     setSelectedProject(project);
     setModules(project.modules);
@@ -48,9 +72,44 @@ const ProjectManagement = () => {
     setIsModalOpen(true);
   };
 
+
+  // Load projects data from Supabase
+  const handleLoadData = async () => {
+    const { data, error } = await supabase
+      .from("projects")
+      .select('*')
+      .order("created_at", { ascending: false });
+  
+    if (error) {
+      console.error("Error loading projects: ", error.message);
+      return;
+    }
+  
+    // Ensure that modules is always an array
+    const projectsWithModules = data.map((project) => ({
+      ...project,
+      modules: Array.isArray(project.modules) ? project.modules : []
+    }));
+  
+    setProjects(projectsWithModules);
+  };
+  
+
+
+  
+  useEffect(() => {
+    handleLoadData();
+  }, []);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-6">
-      {/* Open Modal Button */}
+      {/* Navigation Buttons */}
+      <button
+        onClick={() => router.push("/")}
+        className="mb-4 px-4 py-2 bg-gray-800 text-white rounded-lg"
+      >
+        Back to Homepage
+      </button>
       <button
         onClick={() => {
           setStep(1);
@@ -61,6 +120,7 @@ const ProjectManagement = () => {
         Create New Project
       </button>
 
+
       {/* Projects Table */}
       {projects.length > 0 && (
         <div className="mt-6 w-full max-w-3xl bg-white shadow-md rounded-md p-4">
@@ -68,18 +128,18 @@ const ProjectManagement = () => {
           <table className="w-full border-collapse border border-gray-300">
             <thead>
               <tr className="bg-gray-200">
-                <th className="border p-2">Project Name</th>
-                <th className="border p-2">Description</th>
-                <th className="border p-2">Modules</th>
-                <th className="border p-2">Actions</th>
+                <th className="border p-2 text-black">Project Name</th>
+                <th className="border p-2 text-black">Description</th>
+                <th className="border p-2 text-black">Modules</th>
+                <th className="border p-2 text-black">Actions</th>
               </tr>
             </thead>
             <tbody>
               {projects.map((project) => (
                 <tr key={project.id} className="border">
-                  <td className="border p-2">{project.name}</td>
-                  <td className="border p-2">{project.description}</td>
-                  <td className="border p-2">
+                  <td className="border p-2 text-black">{project.name}</td>
+                  <td className="border p-2 text-black ">{project.description}</td>
+                  <td className="border p-2 text-black">
                     {project.modules.length > 0
                       ? project.modules.map((mod, i) => (
                           <span key={i} className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs mr-1">
@@ -121,7 +181,9 @@ const ProjectManagement = () => {
                 {step === 3 && "Add Security Module"}
                 {step === 4 && "Review & Confirm"}
               </h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-800">✖</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-800">
+                ✖
+              </button>
             </div>
 
             {/* Step 1: Create Project */}
@@ -145,31 +207,6 @@ const ProjectManagement = () => {
                   className="bg-blue-500 text-white w-full py-2 rounded-md hover:bg-blue-600"
                 >
                   Next: Select Project
-                </button>
-              </div>
-            )}
-
-            {/* Step 2: Select Project */}
-            {step === 2 && (
-              <div>
-                <select
-                  className="border p-2 w-full mb-4 rounded-md"
-                  onChange={(e) => {
-                    const project = projects.find((p) => p.id === Number(e.target.value));
-                    setSelectedProject(project);
-                  }}
-                >
-                  <option value="">-- Select Project --</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>{project.name}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => setStep(3)}
-                  className="bg-green-500 text-white w-full py-2 rounded-md hover:bg-green-600"
-                  disabled={!selectedProject}
-                >
-                  Next: Add Module
                 </button>
               </div>
             )}
@@ -202,11 +239,32 @@ const ProjectManagement = () => {
             {/* Step 4: Review & Confirm */}
             {step === 4 && (
               <div>
-                <h3 className="text-lg font-semibold">Project: {selectedProject?.name}</h3>
-                <p className="text-sm mb-4">{selectedProject?.description}</p>
-                <h4 className="font-semibold">Modules:</h4>
+                <h3 className="text-lg font-semibold text-black">Project: {selectedProject?.name}</h3>
+                <input
+                  type="text"
+                  value={selectedProject?.name}
+                  onChange={(e) => setSelectedProject({ ...selectedProject, name: e.target.value })}
+                  className="border p-2 w-full mb-2 rounded-md text-black"
+                />
+                <textarea
+                  value={selectedProject?.description}
+                  onChange={(e) => setSelectedProject({ ...selectedProject, description: e.target.value })}
+                  className="border p-2 w-full mb-4 rounded-md text-black"
+                />
+                <h4 className="font-semibold text-black">Modules:</h4>
                 {modules.map((mod, i) => (
-                  <p key={i} className="text-sm">{mod.name}</p>
+                  <div key={i} className="flex items-center">
+                    <input
+                      type="text"
+                      value={mod.name}
+                      onChange={(e) => {
+                        const updatedModules = [...modules];
+                        updatedModules[i].name = e.target.value;
+                        setModules(updatedModules);
+                      }}
+                      className="border p-2 w-full mb-2 rounded-md text-black"
+                    />
+                  </div>
                 ))}
                 <button
                   onClick={finalizeProject}
@@ -216,6 +274,7 @@ const ProjectManagement = () => {
                 </button>
               </div>
             )}
+
           </div>
         </div>
       )}

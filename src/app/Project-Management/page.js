@@ -3,6 +3,8 @@ import { useState ,useEffect } from "react";
 import supabase from "../utils/supabaseClient";
 import BackButton from "../component/BackButton";
 import { insertData ,deleteData ,fetchData} from "../helper/supabaseHelper";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faEdit, faTrash } from "@fortawesome/free-solid-svg-icons";
 
 
 const ProjectManagement = () => {
@@ -11,6 +13,20 @@ const ProjectManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const actions = [
+    {
+      label: "Edit",
+      icon: faEdit, // Pass the imported icon
+      className: "text-blue-500 hover:text-blue-700",
+      onClick: (item) => console.log("Edit", item),
+    },
+    {
+      label: "Delete",
+      icon: faTrash, // Pass the imported icon
+      className: "text-red-500 hover:text-red-700",
+      onClick: (item) => console.log("Delete", item),
+    },
+  ];
 
   // Create new project
   const handleSave = async () => {
@@ -20,11 +36,27 @@ const ProjectManagement = () => {
         return;
       }
   
+      // Fetch the current user's profile (assuming profile.id is stored in profiles table)
+      const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", (await supabase.auth.getUser()).data?.user?.id)
+      .single();
+    
+    
+  
+      if (error || !profile) {
+        console.error("Error fetching profile:", error?.message || "Profile not found");
+        return;
+      }
+  
       setLoading(true);
   
+      // Insert project with the profile's id as created_by
       const newProject = await insertData("projects", {
         name: selectedProject.name,
         description: selectedProject.description,
+        created_by: profile.id, // Use profile.id instead of user.id
       });
   
       setProjects([...projects, newProject]);
@@ -38,17 +70,15 @@ const ProjectManagement = () => {
   };
   
   
-  
-
 // Edit project
-const editProject = (project) => {
-  setSelectedProject({
-    ...project,
-    name: project.name || '', 
-    description: project.description || '', 
-  });
-  setIsModalOpen(true);
-};
+  const editProject = (project) => {
+    setSelectedProject({
+      ...project,
+      name: project.name || '', 
+      description: project.description || '', 
+    });
+    setIsModalOpen(true);
+  };
 
   // Delete project
   const handleDelete = async (id) => {
@@ -65,7 +95,6 @@ const editProject = (project) => {
       setTimeout(() => setLoading(false), 3000);
     }
   };
-  
 
   // Load projects data from Supabase
   const handleLoadData = async () => {
@@ -109,7 +138,7 @@ const editProject = (project) => {
 
 
       {/* Projects Table */}
-      <div className="mt-6 w-full max-w-3xl bg-white shadow-md rounded-md p-4">
+      <div className="mt-6 w-full max-w-5xl bg-white shadow-lg rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-2 text-gray-800">Project List</h2>
 
         {projects.length > 0 ? (
@@ -126,18 +155,18 @@ const editProject = (project) => {
                 <tr key={project.id} className="border">
                   <td className="border p-2 text-black">{project.name}</td>
                   <td className="border p-2 text-black">{project.description}</td>
-                  <td className="border p-2 flex gap-2">
+                  <td className="border p-2 flex gap-4 justify-center">
                     <button
                       onClick={() => editProject(project)}
-                      className="bg-yellow-500 text-white px-2 py-1 rounded text-sm hover:bg-yellow-600"
+                      className="text-yellow-500 hover:text-yellow-600"
                     >
-                      Edit
+                      <FontAwesomeIcon icon={faEdit} size="lg" />
                     </button>
                     <button
                       onClick={() => handleDelete(project.id)}
-                      className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
+                      className="text-red-500 hover:text-red-600"
                     >
-                      Delete
+                      <FontAwesomeIcon icon={faTrash} size="lg" />
                     </button>
                   </td>
                 </tr>
@@ -156,8 +185,6 @@ const editProject = (project) => {
           </div>
         )}
       </div>
-
-
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center">
@@ -187,7 +214,7 @@ const editProject = (project) => {
               />
 
               {/* Save and Cancel Buttons */}
-              <div className="flex gap-4">
+              <div className="flex gap-4  " >
                 <button
                   onClick={handleSave}
                   className="bg-green-500 text-white flex-1 py-3 rounded-md hover:bg-green-600 flex items-center justify-center text-lg"

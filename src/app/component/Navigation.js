@@ -13,7 +13,7 @@ const links = [
 ];
 
 const Navigation = () => {
-  const pathname = usePathname(); // Correct way to get the current route
+  const pathname = usePathname(); 
 
   return (
     <nav className="w-auto h-auto bg-black text-white p-4">

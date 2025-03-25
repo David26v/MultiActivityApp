@@ -4,11 +4,12 @@ import { usePathname } from "next/navigation";
 import { List, FileText, Star, FileEdit } from "lucide-react";
 
 const links = [
-  { href: "/activity1", label: "Todo List", icon: List },
+  { href: "/Todo-app", label: "Todo List", icon: List },
   { href: "/activity2", label: "Google Drive Lite", icon: FileText },
   { href: "/activity3", label: "Food Review App", icon: Star },
   { href: "/activity4", label: "Pokemon Review", icon: Star },
   { href: "/activity5", label: "Markdown Notes", icon: FileEdit },
+  { href: "/Project-Management", label: "Project Management", icon: FileEdit },
 ];
 
 const Navigation = () => {

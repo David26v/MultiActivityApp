@@ -30,6 +30,7 @@ const Login = ({ setUser, setError, setLoading }) => {
     <h1 className="text-2xl font-semibold mb-4 text-black text-center pb-9">Login</h1>
     
     <input
+      id="email"
       type="email"
       value={email}
       onChange={(e) => setEmail(e.target.value)}
@@ -39,6 +40,7 @@ const Login = ({ setUser, setError, setLoading }) => {
     
     <div className="relative flex justify-center ">
       <input
+        id="password"
         type={showPassword ? "text" : "password"} 
         value={password}
         onChange={(e) => setPassword(e.target.value)}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faComment, faPlus, faImage } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
 import supabase from "../utils/supabaseClient";
 
@@ -13,11 +13,10 @@ export default function TodoList() {
   const [newTask, setNewTask] = useState("");
   const [category, setCategory] = useState("General");
   const [assignedUser, setAssignedUser] = useState("");
-  const [project,setProject] = useState('')
+  const [project, setProject] = useState(""); 
+  const [projects, setProjects] = useState([]); 
   const [dueDate, setDueDate] = useState("");
-  const [image, setImage] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -40,15 +39,18 @@ export default function TodoList() {
     if (user) fetchTasks(user.id);
   }, [user]);
 
-  useEffect(()=>{
-    const fetchProject = async () => {
-        const { data, error } = await supabase.from("projects").select("*");
-        setProject(data);
-    }
-    fetchProject()
-  })
-
- 
+  useEffect(() => {
+    const fetchProjects = async () => {
+      const { data, error } = await supabase.from("projects").select("*");
+      if (error) {
+        console.error("Error fetching projects:", error);
+        setProjects([]);
+      } else {
+        setProjects(data || []);
+      }
+    };
+    fetchProjects();
+  }, []);
 
   const fetchTasks = async (userId) => {
     if (!userId) return;
@@ -57,47 +59,42 @@ export default function TodoList() {
   };
 
   const addTask = async () => {
-    if (newTask.trim() && assignedUser) {
+    if (newTask.trim() && assignedUser && project) {
       if (!user?.id) return;
-      
+
       const { data, error } = await supabase
         .from("todos")
-        .insert([{ 
-          task: newTask, 
-          category, 
-          assigned_to: assignedUser, 
-          due_date: dueDate || null, 
-          completed: false, 
-          user_id: user.id ,
-          project:project
-        }])
+        .insert([
+          {
+            task: newTask,
+            category,
+            assigned_to: assignedUser,
+            due_date: dueDate || null,
+            completed: false,
+            user_id: user.id,
+            project_id: project, // Ensure this stores the project ID correctly
+          },
+        ])
         .select("*");
 
       if (error) {
         console.error("Supabase Insert Error:", error.message);
         return;
       }
-  
+
       setTasks([...tasks, ...data]);
       setNewTask("");
       setCategory("General");
       setAssignedUser("");
-      setDueDate(""); 
+      setDueDate("");
       setProject("");
       setShowModal(false);
     }
   };
-  
-
-  
 
   const deleteTask = async (taskId) => {
     const { error } = await supabase.from("todos").delete().eq("id", taskId);
     if (!error) setTasks(tasks.filter((task) => task.id !== taskId));
-  };
-
-  const handleTaskClick = (task) => {
-    setSelectedTask(task);
   };
 
   return (
@@ -106,23 +103,25 @@ export default function TodoList() {
       <button onClick={() => router.push('/')} className="mb-4 bg-blue-500 text-white p-2 rounded">
         Back to Homepage
       </button>
-      
+
       {/* Task Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {tasks.map((task) => (
-          <div key={task.id} className="bg-white shadow-md p-4 rounded-lg" onClick={() => handleTaskClick(task)}>
-            <h2 className="text-lg font-semibold text-black" >{task.task}</h2>
+          <div key={task.id} className="bg-white shadow-md p-4 rounded-lg">
+            <h2 className="text-lg font-semibold text-black">{task.task}</h2>
             <p className="text-sm text-gray-600">Category: {task.category}</p>
-            <p className="text-sm text-gray-500">Assigned To: {users.find((u) => u.id === task.assigned_to)?.name || "Unassigned"}</p>
+            <p className="text-sm text-gray-500">
+              Assigned To: {users.find((u) => u.id === task.assigned_to)?.name || "Unassigned"}
+            </p>
             <p className="text-sm text-gray-500">Due Date: {task.due_date || "No due date"}</p>
-            <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} className="mt-4 text-red-500 text-sm flex items-center">
+            <button onClick={() => deleteTask(task.id)} className="mt-4 text-red-500 text-sm flex items-center">
               <FontAwesomeIcon icon={faTrash} className="mr-1" />
               Delete
             </button>
           </div>
         ))}
       </div>
-      
+
       {/* Add Task Button */}
       <div className="mt-6">
         <button onClick={() => setShowModal(true)} className="bg-green-500 text-white px-4 py-2 rounded-md flex items-center">
@@ -130,7 +129,7 @@ export default function TodoList() {
           Add Task
         </button>
       </div>
-      
+
       {/* Task Modal */}
       {showModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10">
@@ -138,18 +137,20 @@ export default function TodoList() {
             <h2 className="text-xl font-bold text-black mb-4">Add a New Task</h2>
             <input type="text" value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Task description" className="border p-2 w-full mb-4 text-black" />
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="border p-2 w-full mb-4 text-black" />
-            
-            <select value={assignedUser || ""} onChange={(e) => setAssignedUser(e.target.value)} className="border p-2 w-full mb-4 text-black">
+
+            {/* Assign to User */}
+            <select value={assignedUser} onChange={(e) => setAssignedUser(e.target.value)} className="border p-2 w-full mb-4 text-black">
               <option value="">Assign to...</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>{u.full_name || u.email}</option>
               ))}
             </select>
 
-            <select value={assignedUser || ""} onChange={(e) => setProject(e.target.value)} className="border p-2 w-full mb-4 text-black">
-              <option value="">Project</option>
-              {project.map((project) => (
-                <option key={project.id} value={project.id}>{project.name}</option>
+            {/* Select Project */}
+            <select value={project} onChange={(e) => setProject(e.target.value)} className="border p-2 w-full mb-4 text-black">
+              <option value="">Select Project</option>
+              {projects.map((proj) => (
+                <option key={proj.id} value={proj.id}>{proj.name}</option>
               ))}
             </select>
 

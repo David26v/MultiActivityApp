@@ -1,15 +1,16 @@
 import { usePathname } from "next/navigation";
-import { Menu, X, List, FileText, Star, FileEdit, Clock9 } from "lucide-react";
+import { Menu, X, List, FileText, Star, FileEdit, Clock9 ,UserPen} from "lucide-react";
 import Link from "next/link";
 
 const links = [
   { href: "/Todo-app", label: "Todo List", icon: List },
-  { href: "/activity2", label: "Google Drive Lite", icon: FileText },
-  { href: "/activity3", label: "Food Review App", icon: Star },
-  { href: "/activity4", label: "Pokemon Review", icon: Star },
-  { href: "/activity5", label: "Markdown Notes", icon: FileEdit },
+  // { href: "/activity2", label: "Google Drive Lite", icon: FileText },
+  // { href: "/activity3", label: "Food Review App", icon: Star },
+  // { href: "/activity4", label: "Pokemon Review", icon: Star },
+  // { href: "/activity5", label: "Markdown Notes", icon: FileEdit },
   { href: "/Project-Management", label: "Project Management", icon: FileEdit },
   { href: "/Time-Management", label: "Time Management", icon: Clock9 },
+  { href: "/Attendance", label: "Attendance", icon: UserPen },
 ];
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
